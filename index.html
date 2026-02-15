@@ -1,18 +1,170 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
-<meta charset="UTF-8">
-<title>Luau VM Builder</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Trình Giải Mã LuaObfuscator (Fixed v2)</title>
+    <style>
+        body { font-family: 'Consolas', monospace; background: #0d1117; color: #c9d1d9; padding: 20px; line-height: 1.5; }
+        .container { max-width: 1100px; margin: 0 auto; background: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h2 { color: #58a6ff; text-align: center; margin-bottom: 5px; text-transform: uppercase; }
+        p.subtitle { text-align: center; color: #8b949e; margin-top: 0; margin-bottom: 20px; font-size: 14px; }
+        textarea { width: 100%; height: 280px; background: #010409; color: #7ee787; border: 1px solid #30363d; padding: 15px; border-radius: 8px; box-sizing: border-box; font-size: 12px; resize: vertical; outline: none; }
+        textarea:focus { border-color: #58a6ff; }
+        button { display: block; width: 100%; background: #238636; color: white; border: none; padding: 18px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 8px; margin-top: 15px; transition: 0.3s; text-transform: uppercase; }
+        button:hover { background: #2ea043; transform: translateY(-2px); }
+        .result-box { margin-top: 25px; display: none; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .box-title { font-weight: bold; color: #79c0ff; margin-bottom: 10px; border-bottom: 1px solid #30363d; padding-bottom: 5px; display: flex; justify-content: space-between; }
+        .output { background: #0d1117; border: 1px solid #30363d; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; min-height: 120px; max-height: 400px; overflow-y: auto; font-size: 13px; color: #e6edf3; }
+        .pseudo-code { background: #1c2128; border-left: 4px solid #f0883e; color: #adbac7; }
+        .highlight-blue { color: #58a6ff; font-weight: bold; }
+        .highlight-green { color: #3fb950; }
+        .tag { font-size: 10px; background: #30363d; padding: 2px 6px; border-radius: 4px; color: #8b949e; }
+    </style>
 </head>
 <body>
-<h1>Luau VM Obfuscator</h1>
 
-<textarea id="input" placeholder="Paste payload Luau here..."></textarea>
-<button onclick="build()">BUILD</button>
+<div class="container">
+    <h2>REVERSE ENGINEER TOOLBOX</h2>
+    <p class="subtitle">Chế độ giải mã: Bytecode Stream + Flag 'Q' Handler</p>
+    
+    <textarea id="inputCode" placeholder="Dán FULL code Lua (có chứa LOL!...) vào đây..."></textarea>
+    <button onclick="crackFullObfuscator()">⚡ Bắt đầu giải mã & Phân tích hệ thống</button>
 
-<textarea id="output" placeholder="Output Lua (paste into Roblox)"></textarea>
+    <div id="resultArea" class="result-box">
+        <div class="box-title">
+            <span>🔥 PHÂN TÍCH LUỒNG (Pseudo-code)</span>
+            <span class="tag">AI Logic</span>
+        </div>
+        <div id="pseudoOutput" class="output pseudo-code"></div>
+        <br>
+        <div class="grid">
+            <div>
+                <div class="box-title">🌐 URL / WEBHOOK / API:</div>
+                <div id="urlOutput" class="output highlight-blue"></div>
+            </div>
+            <div>
+                <div class="box-title">📝 DỮ LIỆU CHUỖI TRÍCH XUẤT:</div>
+                <div id="textOutput" class="output highlight-green"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
-<script src="builder.js"></script>
+<script>
+    function crackFullObfuscator() {
+        let input = document.getElementById('inputCode').value;
+        if (!input) return alert("Vui lòng dán code vào!");
+
+        // 1. DỌN DẸP COMMENT
+        input = input.replace(/--\[\[[\s\S]*?\]\]--/g, ''); 
+        input = input.replace(/--[^\n]*/g, ''); 
+
+        // 2. REGEX MỚI: Nhận diện mọi ký tự trong LOL! (bao gồm Q, O, rác...)
+        const regex = /["'](LOL![^"']+)["']/;
+        const match = input.match(regex);
+        
+        if (!match) {
+            return alert("Lỗi: Không tìm thấy vùng nhớ LOL!. Hãy chắc chắn bạn đã dán đúng định dạng.");
+        }
+
+        let payload = match[1].substring(4); // Bỏ chữ LOL!
+        let binaryResult = [];
+        let repeatCount = null;
+
+        // 3. THUẬT TOÁN GIẢI MÃ NÂNG CAO (Xử lý Flag Q và Byte-stream)
+        for (let i = 0; i < payload.length; i++) {
+            let char = payload[i];
+
+            // Nếu gặp Flag 'Q' (ASCII 81) -> Ký tự trước đó là số lần lặp
+            if (char === 'Q') {
+                let prevDigit = payload[i-1];
+                if (/[0-9]/.test(prevDigit)) {
+                    repeatCount = parseInt(prevDigit, 10);
+                }
+                continue;
+            }
+
+            // Kiểm tra cặp Hex (Ví dụ: 0D, 3C, FF)
+            if (i + 1 < payload.length) {
+                let pair = payload.substring(i, i + 2);
+                if (/[0-9A-Fa-f]{2}/.test(pair)) {
+                    let byte = parseInt(pair, 16);
+                    
+                    if (repeatCount !== null) {
+                        // Nếu có flag lặp, thêm byte này N lần
+                        for(let j = 0; j < repeatCount - 1; j++) { 
+                            binaryResult.push(byte);
+                        }
+                        repeatCount = null;
+                    } else {
+                        binaryResult.push(byte);
+                    }
+                    i++; // Nhảy qua ký tự thứ 2 của cặp Hex
+                    continue;
+                }
+            }
+        }
+
+        // 4. TRÍCH XUẤT CHUỖI TỪ BYTE-STREAM
+        let extractedStrings = [];
+        let currentString = "";
+
+        for (let i = 0; i < binaryResult.length; i++) {
+            let code = binaryResult[i];
+            // Chỉ lấy các ký tự in ra được (ASCII 32-126)
+            if (code >= 32 && code <= 126) {
+                currentString += String.fromCharCode(code);
+            } else {
+                if (currentString.length >= 3) {
+                    extractedStrings.push(currentString);
+                }
+                currentString = "";
+            }
+        }
+        if (currentString.length >= 3) extractedStrings.push(currentString);
+
+        // 5. PHÂN LOẠI DỮ LIỆU
+        let foundUrls = [];
+        let normalStrings = [];
+        let pseudoCode = "";
+
+        extractedStrings.forEach(str => {
+            if (/https?:\/\/[^\s]+/.test(str)) {
+                foundUrls.push(str);
+            } else if (str.length > 3) {
+                normalStrings.push(str);
+            }
+        });
+
+        // 6. TÁI TẠO LOGIC DỰA TRÊN TỪ KHÓA (AI Heuristic)
+        let allWords = extractedStrings.join(" ").toLowerCase();
+        
+        if (allWords.includes("httpget") || allWords.includes("request")) {
+            pseudoCode += `-- [PHÂN TÍCH]: Script này là một LOADER (Tải code từ xa).\n`;
+            if(foundUrls.length > 0) {
+                pseudoCode += `local targetURL = "${foundUrls[0]}"\n`;
+                pseudoCode += `game:HttpGet(targetURL) -- Tải và thực thi script chính từ đây\n`;
+            }
+        } else if (allWords.includes("webhook") || allWords.includes("discord")) {
+            pseudoCode += `-- [PHÂN TÍCH]: Script có hành vi gửi dữ liệu (Log/Stealer) về Discord.\n`;
+        } else {
+            pseudoCode += `-- [PHÂN TÍCH]: Bytecode chứa các hằng số cục bộ.\n`;
+            pseudoCode += `-- Có thể là script chức năng (Auto Farm, ESP, GUI).\n`;
+        }
+        
+        pseudoCode += `\n-- Danh sách các hàm/biến phát hiện được:\n`;
+        let functions = normalStrings.filter(s => s.length < 20).slice(0, 10);
+        functions.forEach(f => pseudoCode += `function ${f.replace(/[^a-zA-Z]/g, '')}()\n`);
+
+        // 7. HIỂN THỊ KẾT QUẢ
+        document.getElementById('resultArea').style.display = 'block';
+        document.getElementById('pseudoOutput').innerText = pseudoCode;
+        document.getElementById('urlOutput').innerText = foundUrls.length > 0 ? foundUrls.join("\n") : "Không tìm thấy URL kết nối.";
+        document.getElementById('textOutput').innerText = normalStrings.length > 0 ? normalStrings.join("\n") : "Dữ liệu bytecode quá nát, không thể lọc chuỗi sạch.";
+    }
+</script>
+
 </body>
 </html>
